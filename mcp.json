@@ -1,0 +1,113 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schema/2026-03-05/server-manifest.json",
+  "name": "hyperv-mcp",
+  "version": "0.1.0",
+  "displayName": "AIWFF Hyper-V MCP Server",
+  "description": "Agentic control plane for Microsoft Hyper-V virtual machines via the Model Context Protocol. v0.1 ships mock stubs; v0.2 wires real Hyper-V cmdlets.",
+  "vendor": {
+    "name": "AIWFF Project",
+    "url": "https://github.com/zaxardery8011-design/hyperv-mcp"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/zaxardery8011-design/hyperv-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zaxardery8011-design/hyperv-mcp.git"
+  },
+  "keywords": ["mcp", "hyper-v", "windows", "virtualization", "on-prem", "gpu-pv"],
+  "runtime": {
+    "type": "python",
+    "minimumVersion": "3.10",
+    "entry": "server.py",
+    "command": "python",
+    "args": ["server.py"]
+  },
+  "transport": {
+    "type": "stdio",
+    "alternatives": ["streamable-http"]
+  },
+  "capabilities": {
+    "tools": true,
+    "resources": false,
+    "prompts": false,
+    "logging": true
+  },
+  "tools": [
+    {
+      "name": "list_vms",
+      "description": "List Hyper-V virtual machines on the host with state and basic metadata.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state_filter": {
+            "type": "string",
+            "enum": ["any", "Running", "Off", "Saved", "Paused"],
+            "default": "any"
+          },
+          "name_pattern": {
+            "type": "string",
+            "description": "Optional wildcard pattern (PowerShell -Like syntax), e.g. 'LINC-*'."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "start_vm",
+      "description": "Start a Hyper-V VM by name. Idempotent if already Running.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "wait_for_heartbeat": { "type": "boolean", "default": false },
+          "timeout_sec": { "type": "integer", "minimum": 1, "maximum": 600, "default": 60 }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "stop_vm",
+      "description": "Stop a Hyper-V VM. Defaults to graceful shutdown; force=true issues power-off.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "force": { "type": "boolean", "default": false },
+          "save": { "type": "boolean", "default": false, "description": "Save state instead of shutdown (mutually exclusive with force)." }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "snapshot_vm",
+      "description": "Create a checkpoint (snapshot) of a VM. Returns snapshot id and parent.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "snapshot_name": { "type": "string", "description": "Defaults to ISO-8601 timestamp." }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_vm_metrics",
+      "description": "Return CPU / memory / disk / network metrics for a VM (or aggregate for the host).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Omit for host aggregate." },
+          "include": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["cpu", "memory", "disk", "network"] },
+            "default": ["cpu", "memory"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  mock-tests:
+    name: mock backend tests (Windows)
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Show environment
+        shell: pwsh
+        run: |
+          python --version
+          pip --version
+          Write-Host "HYPERV_MCP_MODE=$env:HYPERV_MCP_MODE"
+
+      - name: Mock smoke (no extra deps)
+        shell: pwsh
+        env:
+          HYPERV_MCP_MODE: mock
+        run: |
+          python tests/mock_server_test.py
+
+      - name: Install runtime deps
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install mcp
+
+      - name: Mock e2e with MCP SDK installed
+        shell: pwsh
+        env:
+          HYPERV_MCP_MODE: mock
+        run: |
+          python tests/mock_server_test.py
+
+  lint:
+    name: lint
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: ruff check
+        shell: pwsh
+        run: |
+          ruff check server.py tests/
+
+      - name: Validate mcp.json
+        shell: pwsh
+        run: |
+          $manifest = Get-Content mcp.json -Raw | ConvertFrom-Json
+          if (-not $manifest.tools -or $manifest.tools.Count -lt 5) {
+            Write-Error "mcp.json must declare at least 5 tools (got $($manifest.tools.Count))"
+            exit 1
+          }
+          Write-Host "mcp.json OK: $($manifest.tools.Count) tools declared"
+
+      - name: PowerShell wrapper syntax check
+        shell: pwsh
+        run: |
+          $errors = @()
+          Get-ChildItem tools\*.ps1 | ForEach-Object {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName, [ref]$tokens, [ref]$parseErrors
+            ) | Out-Null
+            if ($parseErrors.Count -gt 0) {
+              $errors += "$($_.Name): $($parseErrors.Count) parse error(s)"
+              $parseErrors | ForEach-Object { Write-Host "  $_" }
+            }
+          }
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+          Write-Host "All PowerShell wrappers parsed cleanly"
