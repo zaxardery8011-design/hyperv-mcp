@@ -10,7 +10,6 @@ Exit code 0 = all pass; non-zero = first failure printed.
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 import traceback

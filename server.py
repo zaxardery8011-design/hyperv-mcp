@@ -314,7 +314,7 @@ def main() -> int:
         print(f"[hyperv-mcp] ERROR: HYPERV_MCP_MODE must be mock|live, got {MODE!r}")
         return 2
     if MODE == "live":
-        print(f"[hyperv-mcp] WARNING: live mode is not implemented in v0.1; falling back to mock")
+        print("[hyperv-mcp] WARNING: live mode is not implemented in v0.1; falling back to mock")
 
     try:
         _run_with_mcp_sdk()
